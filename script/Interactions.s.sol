@@ -98,7 +98,7 @@ contract AddConsumer is Script {
 
 //Below we need to make a new contract to fund the subscription
 contract FundSubscription is Script {
-    uint96 public constant FUND_AMOUNT = 3 ether;
+    uint96 public constant FUND_AMOUNT = 1 ether;
 
     function fundSubscriptionUsingConfig() public {
         //we need subscription Id, LINK address, and VRFCoordinatorV2 address
@@ -140,6 +140,17 @@ contract FundSubscription is Script {
         console.log("Funding subscription", subId);
         console.log("Using vrfCoordinator", vrfCoordinatorV2);
         console.log("On ChainId", block.chainid);
+
+        // Log the initial balances
+        console.log(
+            "Initial LINK balance of caller:",
+            LinkToken(link).balanceOf(msg.sender)
+        );
+        console.log(
+            "Initial LINK balance of VRFCoordinatorV2:",
+            LinkToken(link).balanceOf(vrfCoordinatorV2)
+        );
+
         //vrfCoordinatorMock works slightly different with the LINK token transfers
         if (block.chainid == 31337) {
             //if we are on Anvil local chain we do the following;
@@ -163,6 +174,16 @@ contract FundSubscription is Script {
             ); //don't worry about this for now as this will be re-visited in later courses. we are doing a transfer call to fund our subscription
             vm.stopBroadcast();
         }
+
+        // Log the final balances
+        console.log(
+            "Final LINK balance of caller:",
+            LinkToken(link).balanceOf(msg.sender)
+        );
+        console.log(
+            "Final LINK balance of VRFCoordinatorV2:",
+            LinkToken(link).balanceOf(vrfCoordinatorV2)
+        );
     }
 
     function run() external {

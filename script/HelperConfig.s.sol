@@ -23,9 +23,6 @@ contract HelperConfig is Script {
     uint256 public DEFAULT_ANVIL_PRIVATE_KEY =
         0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
-    uint256 public ACTUAL_PRIVATE_KEY =
-        0xa5ec357704402d7d7295439cda7a0d9d4522b6fa5009464a815a0351a9ebbabf;
-
     event HelperConfig__CreatedMockVRFCoordinator(address vrfCoordinator);
 
     constructor() {
@@ -51,7 +48,7 @@ contract HelperConfig is Script {
             callbackGasLimit: 500000, // 500,000 gas
             vrfCoordinatorV2: 0x271682DEB8C4E0901D1a1550aD2e64D568E69909,
             link: 0x514910771AF9Ca656af840dff83E8264EcF986CA,
-            deployerKey: ACTUAL_PRIVATE_KEY
+            deployerKey: vm.envUint("PRIVATE_KEY")
         });
     }
 
@@ -63,14 +60,14 @@ contract HelperConfig is Script {
     {
         return
             sepoliaNetworkConfig = NetworkConfig({
-                subscriptionId: 0, // If left as 0, our scripts will create one!
+                subscriptionId: 64747507628753327729568699735272336201040524299521005470069261295730595969022, // If left as 0, our scripts will create one!
                 gasLane: 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c,
                 automationUpdateInterval: 30, // 30 seconds
                 raffleEntranceFee: 0.01 ether,
                 callbackGasLimit: 500000, // 500,000 gas
                 vrfCoordinatorV2: 0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625,
                 link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
-                deployerKey: ACTUAL_PRIVATE_KEY
+                deployerKey: vm.envUint("PRIVATE_KEY")
             });
     }
 
