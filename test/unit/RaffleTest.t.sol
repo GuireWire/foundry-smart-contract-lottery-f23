@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.19;
 
 import {DeployRaffle} from "../../script/DeployRaffle.s.sol";
 import {Raffle} from "../../src/Raffle.sol";
-import {Test, console} from "forge-std/Test.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {StdCheats} from "forge-std/StdCheats.sol";
-import {VRFCoordinatorV2Mock} from "@chainlink/contracts/src/v0.8/mocks/VRFCoordinatorV2Mock.sol";
-import {CreateSubscription} from "../../script/Interactions.s.sol";
+import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {LinkToken} from "../../test/mocks/LinkToken.sol";
+import {CodeConstants} from "../../script/HelperConfig.s.sol";
 
-contract RaffleTest is StdCheats, Test {
-    /**Events */
+contract RaffleTest is Test, CodeConstants {
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
     event RequestedRaffleWinner(uint256 indexed requestId);
     event RaffleEnter(address indexed player);
     event WinnerPicked(address indexed player);
@@ -21,16 +23,18 @@ contract RaffleTest is StdCheats, Test {
     HelperConfig public helperConfig;
 
     //creating state variables for the raffle deployer section that references the HelperConfig variables
-    uint64 subscriptionId;
+    uint256 subscriptionId;
     bytes32 gasLane;
     uint256 automationUpdateInterval;
     uint256 raffleEntranceFee;
     uint32 callbackGasLimit;
-    address vrfCoordinatorV2;
+    address vrfCoordinatorV2_5;
+    LinkToken link;
 
     //we will create a starting user to interact with raffle
     address public PLAYER = makeAddr("player"); //we are using a foundry cheat to create a player for us with a starting balance
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
+    uint256 public constant LINK_BALANCE = 100 ether;
 
     //set up function to create raffle deployer
     function setUp() external {
@@ -39,24 +43,31 @@ contract RaffleTest is StdCheats, Test {
         (raffle, helperConfig) = deployer.run(); //because our DeployRaffle contract is returning a raffle and helperConfig
         vm.deal(PLAYER, STARTING_USER_BALANCE); // this cheatcode gives PLAYER some money
 
-        (
-            ,
-            gasLane,
-            automationUpdateInterval,
-            raffleEntranceFee,
-            callbackGasLimit,
-            vrfCoordinatorV2, // link
-            // deployerKey
-            ,
+        HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
+        subscriptionId = config.subscriptionId;
+        gasLane = config.gasLane;
+        automationUpdateInterval = config.automationUpdateInterval;
+        raffleEntranceFee = config.raffleEntranceFee;
+        callbackGasLimit = config.callbackGasLimit;
+        vrfCoordinatorV2_5 = config.vrfCoordinatorV2_5;
+        link = LinkToken(config.link);
 
-        ) = helperConfig.activeNetworkConfig();
+        vm.startPrank(msg.sender);
+        if (block.chainid == LOCAL_CHAIN_ID) {
+            link.mint(msg.sender, LINK_BALANCE);
+            VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fundSubscription(
+                subscriptionId,
+                LINK_BALANCE
+            );
+        }
+        link.approve(vrfCoordinatorV2_5, LINK_BALANCE);
+        vm.stopPrank();
     }
 
     //function to test if raffle opens in open state
     function testRaffleInitializesInOpenState() public view {
-        assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN); // we made a raffle state function in the Raffle contract to cover this
-        // Raffle.RaffleState.OPEN means that on any raffle contract, the RaffleState enum/type - get the open value for that.
-    }
+        assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
+    } // we made a raffle state function in the Raffle contract to cover this // Raffle.RaffleState.OPEN means that on any raffle contract, the RaffleState enum/type - get the open value for that.
 
     ////////////////////////////
     // enter Raffle function  //
@@ -196,14 +207,6 @@ contract RaffleTest is StdCheats, Test {
         raffle.performUpkeep(""); //we are expecting this to fail with error code (Raffle.Raffle__UpkeepNotNeeded.selector) with these parameters(currentBalance,numPlayers,rState)
     }
 
-    modifier raffleEntered() {
-        vm.prank(PLAYER);
-        raffle.enterRaffle{value: raffleEntranceFee}();
-        vm.warp(block.timestamp + automationUpdateInterval + 1);
-        vm.roll(block.number + 1);
-        _;
-    }
-
     //What if I need to test using the output of an event?
     //If i'm building a Chainlink like system, i need to be able to test for events being emitted and values being emitted
     function testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId() public {
@@ -228,6 +231,14 @@ contract RaffleTest is StdCheats, Test {
     // fulfillRandomWords //
     ////////////////////////
 
+    modifier raffleEntered() {
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: raffleEntranceFee}();
+        vm.warp(block.timestamp + automationUpdateInterval + 1);
+        vm.roll(block.number + 1);
+        _;
+    }
+
     modifier skipFork() {
         if (block.chainid != 31337) {
             return;
@@ -235,15 +246,23 @@ contract RaffleTest is StdCheats, Test {
         _;
     }
 
-    function testFulfillRandomWordsCanOnlyBeCalledAfterPerformUpkeep(
-        uint256 randomRequestId
-    ) public raffleEntered skipFork {
+    function testFulfillRandomWordsCanOnlyBeCalledAfterPerformUpkeep()
+        public
+        raffleEntered
+        skipFork
+    {
         // Arrange
         // Act / Assert
-        vm.expectRevert("nonexistent request");
+        vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
         // vm.mockCall could be used here...
-        VRFCoordinatorV2Mock(vrfCoordinatorV2).fulfillRandomWords( //import VRFCoordinatorV2Mock into RaffleTest.t.sol
-            randomRequestId, //this is known as fuzz test - foundry creates random number and calls this test many times with many random numbers
+        VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(
+            0,
+            address(raffle)
+        );
+
+        vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
+        VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(
+            1,
             address(raffle)
         );
     }
@@ -277,10 +296,11 @@ contract RaffleTest is StdCheats, Test {
         vm.recordLogs();
         raffle.performUpkeep(""); // emits requestId
         Vm.Log[] memory entries = vm.getRecordedLogs();
+        console2.logBytes32(entries[1].topics[1]);
         bytes32 requestId = entries[1].topics[1]; // get the requestId from the logs
 
         //now we need to pretend to be Chainlink VRF to get random number and pick winner
-        VRFCoordinatorV2Mock(vrfCoordinatorV2).fulfillRandomWords(
+        VRFCoordinatorV2_5Mock(vrfCoordinatorV2_5).fulfillRandomWords(
             uint256(requestId),
             address(raffle)
         );
