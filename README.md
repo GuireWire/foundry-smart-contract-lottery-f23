@@ -5,7 +5,7 @@
 
 # Foundry Smart Contract Lottery
 
-This is a section of the Cyfrin Foundry Solidity Course. Specifically Course 3 Section 4 Foundry Smart Contract Lottery.
+This is a section of the Cyfrin Foundry Solidity Course. Specifically Course 3 Section 4 Foundry Smart Contract Lottery. Would have deployed contract to Sepolia but need more SepoliaETH to carry out transaction runs.
 
 *[⭐️ (3:04:09) | Lesson 9: Foundry Smart Contract Lottery](https://www.youtube.com/watch?v=sas02qSFZ74&t=11049s)*
 
