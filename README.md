@@ -1,8 +1,3 @@
-
-> ! Updates from Video
-> 1. V2.5 of Chainlink VRF uses a `uint256` as a subId instead of a `uint64` this repo has a comment to reflect that. We added a mock in case you'd like to work with version 2.5.
-> 2. We use `0.1.0` of the `foundry-devops` package which doesn't need to have `ffi=true`
-
 # Foundry Smart Contract Lottery
 
 This is a section of the Cyfrin Foundry Solidity Course. Specifically Course 3 Section 4 Foundry Smart Contract Lottery. Would have deployed contract to Sepolia but need more SepoliaETH to carry out transaction runs.
